@@ -16,7 +16,7 @@ from scipy import misc, ndimage
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Reshape
-from keras.layers import Conv2D, Conv2DTranspose, UpSampling2D
+from keras.layers import Conv2D, Conv2DTranspose, UpSampling2D, Convolution2D
 from keras.layers import LeakyReLU, Dropout
 from keras.layers import BatchNormalization
 from keras.optimizers import Adam, RMSprop
@@ -79,29 +79,22 @@ class DCGAN(object):
             return self.D
         self.D = Sequential()
         depth = 256
-        dropout = 0.4
+        dropout = 0.3
         # In: 28 x 28 x 1, depth = 1
         # Out: 14 x 14 x 1, depth=64
         input_shape = (self.img_rows, self.img_cols, self.channel)
         self.D.add(Conv2D(depth*1, 5, strides=2, input_shape=input_shape,\
             padding='same'))
-        self.D.add(LeakyReLU(alpha=0.2))
+        self.D.add(LeakyReLU(alpha=0.3))
         self.D.add(Dropout(dropout))
 
         self.D.add(Conv2D(depth*2, 5, strides=2, padding='same'))
-        self.D.add(LeakyReLU(alpha=0.2))
-        self.D.add(Dropout(dropout))
-
-        self.D.add(Conv2D(depth*4, 5, strides=2, padding='same'))
-        self.D.add(LeakyReLU(alpha=0.2))
-        self.D.add(Dropout(dropout))
-
-        self.D.add(Conv2D(depth*8, 5, strides=1, padding='same'))
-        self.D.add(LeakyReLU(alpha=0.2))
+        self.D.add(LeakyReLU(alpha=0.3))
         self.D.add(Dropout(dropout))
 
         # Out: 1-dim probability
         self.D.add(Flatten())
+        Dense(256, activation=LeakyReLU())
         self.D.add(Dense(1))
         self.D.add(Activation('sigmoid'))
         self.D.summary()
@@ -111,7 +104,7 @@ class DCGAN(object):
         if self.G:
             return self.G
         self.G = Sequential()
-        dropout = 0.4
+        dropout = 0.3
         #not sure what this is
         depth = 64+64+64+64
         #1/4 the length of one side
@@ -119,29 +112,22 @@ class DCGAN(object):
         
         # In: 100
         # Out: dim x dim x depth
-        self.G.add(Dense(dim*dim*depth, input_dim=100))
+        self.G.add(Dense(dim*dim*depth*2, input_dim=100, activation=LeakyReLU()))
         self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Activation('relu'))
-        self.G.add(Reshape((dim, dim, depth)))
-        self.G.add(Dropout(dropout))
+        self.G.add(Reshape((dim, dim, depth*2)))
+        #self.G.add(Dropout(dropout))
 
         # In: dim x dim x depth
         # Out: 2*dim x 2*dim x depth/2
         self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth/2), 10, padding='same'))
+        self.G.add(Conv2DTranspose(int(depth/4), 3, padding='same', activation=LeakyReLU()))
         self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Activation('relu'))
 
         self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth/4), 10, padding='same'))
-        self.G.add(BatchNormalization(momentum=0.9))
-        self.G.add(Activation('relu'))
-
-        self.G.add(Conv2DTranspose(int(depth/8), 10, padding='same'))
+        self.G.add(Conv2DTranspose(int(depth/8), 3, padding='same', activation=LeakyReLU()))
         self.G.add(BatchNormalization(momentum=0.99))
-        self.G.add(Activation('relu'))
-
-        # Out: 28 x 28 x 1 grayscale image [0.0,1.0] per pix
+        
+        #Convolution2D(1, 1, 1, border_mode='same', activation='sigmoid')
         self.G.add(Conv2DTranspose(3, 10, padding='same'))
         self.G.add(Activation('sigmoid'))
         self.G.summary()
@@ -150,7 +136,7 @@ class DCGAN(object):
     def discriminator_model(self):
         if self.DM:
             return self.DM
-        optimizer = Adam()
+        optimizer = Adam(1e-3)
         self.DM = Sequential()
         self.DM.add(self.discriminator())
         self.DM.compile(loss='binary_crossentropy', optimizer=optimizer,\
@@ -160,7 +146,7 @@ class DCGAN(object):
     def adversarial_model(self):
         if self.AM:
             return self.AM
-        optimizer = Adam()
+        optimizer = Adam(1e-4)
         self.AM = Sequential()
         self.AM.add(self.generator())
         self.AM.add(self.discriminator())
@@ -187,8 +173,6 @@ class MNIST_DCGAN(object):
         for image in imagesList:
             i += 1
             print i
-            #if i > 500:
-             #   break
             #img = Image.open(data_path + image)
             img = ndimage.imread(data_path + image, mode="RGB")
             img = misc.imresize(img, (28, 28))
@@ -196,7 +180,7 @@ class MNIST_DCGAN(object):
             #np.reshape(data, (256, 256, 1))
             print data.shape
             #if i % 100 ==0:
-            #    misc.imsave(str(i)+'orig.png', data)
+                #misc.imsave(str(i)+'orig.png', data)
             #img = PImage.open(data_path + image)
             loadedImages.append(data)
         
