@@ -111,13 +111,15 @@ class DCGAN(object):
         #not sure what this is
         depth = 64+64+64+64
         #1/4 the length of one side
-        dim = self.img_rows/8 #4
+        dim = self.img_rows/2 #4
+        nch = 200
         
         # In: 100
         # Out: dim x dim x depth
-        self.G.add(Dense(dim*dim*depth*2, input_dim=100))
+        self.G.add(Dense(nch*dim*dim, input_dim=100, kernel_initializer='glorot_normal'))
         self.G.add(BatchNormalization())
-        self.G.add(Reshape((dim, dim, depth*2)))
+        self.G.add(Activation('relu'))
+        self.G.add(Reshape((dim, dim, nch)))
         #self.G.add(Dropout(dropout))
         #self.G.add(Conv2DTranspose(int(depth/4), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
         #self.G.add(BatchNormalization())
@@ -125,17 +127,27 @@ class DCGAN(object):
         # In: dim x dim x depth
         # Out: 2*dim x 2*dim x depth/2
         #self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        self.G.add(Conv2DTranspose(int(nch//2), kernel_size = (3,3), strides=(2, 2), padding='same', init='glorot_uniform'))
         self.G.add(BatchNormalization())
+        self.G.add(Activation('relu'))
 
         #self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth/2), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        self.G.add(Conv2DTranspose(int(nch//4), kernel_size = (3,3), strides=(2, 2), padding='same', init='glorot_uniform'))
         self.G.add(BatchNormalization())
+        self.G.add(Activation('relu'))
         
         #self.G.add(UpSampling2D())
-        #Convolution2D(1, 1, 1, border_mode='same', activation='sigmoid')
-        self.G.add(Conv2DTranspose(self.channel, 10, strides=(2, 2), padding='same'))
-        self.G.add(Activation('tanh'))
+        self.G.add(Convolution2D(int(nch//4), kernel_size = (3,3), strides=(2, 2), padding='same', init='glorot_uniform'))
+        self.G.add(BatchNormalization())
+        self.G.add(Activation('relu'))
+        
+        self.G.add(Convolution2D(3, 1, 1, border_mode='same', activation='tanh'))
+        #self.G.add(Conv2DTranspose(self.channel, 10, strides=(1, 1), padding='same'))
+        #self.G.add(Conv2DTranspose(self.channel, 10, strides=(2, 2), padding='same'))
+        #self.G.add(Activation('tanh'))
+        #self.G.summary()
+        #return self.G
+        #self.G.add(Activation('sigmoid'))
         self.G.summary()
         return self.G
 
@@ -162,15 +174,15 @@ class DCGAN(object):
 
 class MNIST_DCGAN(object):
     def __init__(self):
-        self.img_rows = 32
-        self.img_cols = 32
+        self.img_rows = 128
+        self.img_cols = 128
         self.channel = 3
         
         data_path = "/work/04381/ymarathe/maverick/dogscats/train/cats/"
 
         #self.x_train = input_data.read_data_sets("mnist",\
         	#one_hot=True).train.images
-        '''    
+          
         train_datagen = ImageDataGenerator()
         
         imagesList = listdir(data_path)
@@ -193,9 +205,9 @@ class MNIST_DCGAN(object):
             loadedImages.append(data)
         
         self.x_train = np.asarray(loadedImages)
-        '''
-        (x_train, y_train), (x_test, y_test) = cifar10.load_data()
-        self.x_train = x_train[:5000]
+        
+        #(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+        #self.x_train = x_train[:5000]
         print self.x_train.shape
         #train_datagen.flow_from_directory(
             #data_path, target_size=(256, 256), batch_size=32, class_mode='categorical')
@@ -234,7 +246,7 @@ class MNIST_DCGAN(object):
                         noise=noise_input, step=(i+1))
 
     def plot_images(self, save2file=False, fake=True, samples=16, noise=None, step=0):
-        name = "cifar"
+        name = "pussy"
         filename = name + '.png'
         if fake:
             if noise is None:
@@ -263,7 +275,7 @@ class MNIST_DCGAN(object):
 if __name__ == '__main__':
     mnist_dcgan = MNIST_DCGAN()
     timer = ElapsedTimer()
-    mnist_dcgan.train(train_steps=5000, batch_size=128, save_interval=500)
+    mnist_dcgan.train(train_steps=10000, batch_size=32, save_interval=500)
     timer.elapsed_time()
     mnist_dcgan.plot_images(fake=True)
     mnist_dcgan.plot_images(fake=False, save2file=True)

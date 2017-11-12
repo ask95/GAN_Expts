@@ -125,16 +125,19 @@ class DCGAN(object):
         # In: dim x dim x depth
         # Out: 2*dim x 2*dim x depth/2
         #self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        #self.G.add(Conv2DTranspose(int(depth), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        self.G.add(Conv2D(int(depth), kernel_size = (5,5), strides=(0.5, 0.5), padding='same', activation='relu'))
         self.G.add(BatchNormalization())
 
         #self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth/2), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        #self.G.add(Conv2DTranspose(int(depth/2), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
+        self.G.add(Conv2D(int(depth/2), kernel_size = (5,5), strides=(0.5, 0.5), padding='same', activation='relu'))
         self.G.add(BatchNormalization())
         
         #self.G.add(UpSampling2D())
         #Convolution2D(1, 1, 1, border_mode='same', activation='sigmoid')
-        self.G.add(Conv2DTranspose(self.channel, 10, strides=(2, 2), padding='same'))
+        #self.G.add(Conv2DTranspose(self.channel, 10, strides=(2, 2), padding='same'))
+        self.G.add(Conv2D(self.channel, 10, strides=(0.5, 0.5), padding='same'))
         self.G.add(Activation('tanh'))
         self.G.summary()
         return self.G
