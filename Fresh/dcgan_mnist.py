@@ -15,12 +15,11 @@ from scipy import misc, ndimage
 #from tensorflow.examples.tutorials.mnist import input_data
 
 from keras.models import Sequential
-from keras.datasets import cifar10, mnist
 from keras.layers import Dense, Activation, Flatten, Reshape
-from keras.layers import Conv2D, Conv2DTranspose, UpSampling2D, Convolution2D
+from keras.layers import Conv2D, Conv2DTranspose, UpSampling2D
 from keras.layers import LeakyReLU, Dropout
 from keras.layers import BatchNormalization
-from keras.optimizers import Adam, RMSprop, SGD
+from keras.optimizers import Adam, RMSprop
 
 import matplotlib.pyplot as plt
 
@@ -80,7 +79,7 @@ class DCGAN(object):
             return self.D
         self.D = Sequential()
         depth = 256
-        dropout = 0.3
+        dropout = 0.4
         # In: 28 x 28 x 1, depth = 1
         # Out: 14 x 14 x 1, depth=64
         input_shape = (self.img_rows, self.img_cols, self.channel)
@@ -88,16 +87,21 @@ class DCGAN(object):
             padding='same'))
         self.D.add(LeakyReLU(alpha=0.2))
         self.D.add(Dropout(dropout))
-        self.D.add(BatchNormalization())
 
         self.D.add(Conv2D(depth*2, 5, strides=2, padding='same'))
         self.D.add(LeakyReLU(alpha=0.2))
         self.D.add(Dropout(dropout))
-        self.D.add(BatchNormalization())
+
+        self.D.add(Conv2D(depth*4, 5, strides=2, padding='same'))
+        self.D.add(LeakyReLU(alpha=0.2))
+        self.D.add(Dropout(dropout))
+
+        self.D.add(Conv2D(depth*8, 5, strides=1, padding='same'))
+        self.D.add(LeakyReLU(alpha=0.2))
+        self.D.add(Dropout(dropout))
 
         # Out: 1-dim probability
         self.D.add(Flatten())
-        Dense(256, activation=LeakyReLU(alpha=0.2))
         self.D.add(Dense(1))
         self.D.add(Activation('sigmoid'))
         self.D.summary()
@@ -107,42 +111,46 @@ class DCGAN(object):
         if self.G:
             return self.G
         self.G = Sequential()
-        dropout = 0.3
+        dropout = 0.4
         #not sure what this is
         depth = 64+64+64+64
         #1/4 the length of one side
-        dim = self.img_rows/4 #4
+        dim = 7
         
         # In: 100
         # Out: dim x dim x depth
-        self.G.add(Dense(dim*dim*depth*2, input_dim=100))
-        self.G.add(BatchNormalization())
-        self.G.add(Reshape((dim, dim, depth*2)))
-        #self.G.add(Dropout(dropout))
-        #self.G.add(Conv2DTranspose(int(depth/4), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
-        #self.G.add(BatchNormalization())
+        self.G.add(Dense(dim*dim*depth, input_dim=100))
+        self.G.add(BatchNormalization(momentum=0.9))
+        self.G.add(Activation('relu'))
+        self.G.add(Reshape((dim, dim, depth)))
+        self.G.add(Dropout(dropout))
 
         # In: dim x dim x depth
         # Out: 2*dim x 2*dim x depth/2
-        #self.G.add(UpSampling2D())
-        self.G.add(Conv2DTranspose(int(depth), kernel_size = (3,3), strides=(2, 2), padding='same', activation='relu'))
-        self.G.add(BatchNormalization())
+        self.G.add(UpSampling2D())
+        self.G.add(Conv2DTranspose(int(depth/2), 10, padding='same'))
+        self.G.add(BatchNormalization(momentum=0.9))
+        self.G.add(Activation('relu'))
 
-        #self.G.add(UpSampling2D())
-        #self.G.add(Conv2DTranspose(int(depth/2), kernel_size = (5,5), strides=(2, 2), padding='same', activation='relu'))
-        #self.G.add(BatchNormalization())
-        
-        #self.G.add(UpSampling2D())
-        #Convolution2D(1, 1, 1, border_mode='same', activation='sigmoid')
-        self.G.add(Conv2DTranspose(self.channel, 10, strides=(2, 2), padding='same'))
-        self.G.add(Activation('tanh'))
+        self.G.add(UpSampling2D())
+        self.G.add(Conv2DTranspose(int(depth/4), 10, padding='same'))
+        self.G.add(BatchNormalization(momentum=0.9))
+        self.G.add(Activation('relu'))
+
+        self.G.add(Conv2DTranspose(int(depth/8), 10, padding='same'))
+        self.G.add(BatchNormalization(momentum=0.99))
+        self.G.add(Activation('relu'))
+
+        # Out: 28 x 28 x 1 grayscale image [0.0,1.0] per pix
+        self.G.add(Conv2DTranspose(3, 10, padding='same'))
+        self.G.add(Activation('sigmoid'))
         self.G.summary()
         return self.G
 
     def discriminator_model(self):
         if self.DM:
             return self.DM
-        optimizer = Adam(lr=0.0002, beta_1=0.5)
+        optimizer = Adam()
         self.DM = Sequential()
         self.DM.add(self.discriminator())
         self.DM.compile(loss='binary_crossentropy', optimizer=optimizer,\
@@ -152,7 +160,7 @@ class DCGAN(object):
     def adversarial_model(self):
         if self.AM:
             return self.AM
-        optimizer = Adam(lr=0.0002, beta_1=0.5)
+        optimizer = Adam()
         self.AM = Sequential()
         self.AM.add(self.generator())
         self.AM.add(self.discriminator())
@@ -164,13 +172,13 @@ class MNIST_DCGAN(object):
     def __init__(self):
         self.img_rows = 28
         self.img_cols = 28
-        self.channel = 1
+        self.channel = 3
         
         data_path = "/work/04381/ymarathe/maverick/dogscats/train/cats/"
 
         #self.x_train = input_data.read_data_sets("mnist",\
         	#one_hot=True).train.images
-        '''    
+            
         train_datagen = ImageDataGenerator()
         
         imagesList = listdir(data_path)
@@ -179,32 +187,27 @@ class MNIST_DCGAN(object):
         for image in imagesList:
             i += 1
             print i
-            if i > 5000:
+            if i > 500:
                 break
             #img = Image.open(data_path + image)
             img = ndimage.imread(data_path + image, mode="RGB")
-            img = misc.imresize(img, (self.img_rows, self.img_cols))
+            img = misc.imresize(img, (28, 28))
             data = np.asarray(img, dtype="int32")
             #np.reshape(data, (256, 256, 1))
             print data.shape
-            #if i % 100 ==0:
-                #misc.imsave(str(i)+'orig.png', data)
+            if i % 100 ==0:
+                misc.imsave(str(i)+'orig.png', data)
             #img = PImage.open(data_path + image)
             loadedImages.append(data)
         
         self.x_train = np.asarray(loadedImages)
-        '''
-        (x_train, y_train), (x_test, y_test) = mnist.load_data()
-        self.x_train = x_train[:10000]
-        print self.x_train.shape
-        self.x_train = self.x_train.reshape(len(self.x_train), len(self.x_train[0]), len(self.x_train[1]), 1)
         print self.x_train.shape
         #train_datagen.flow_from_directory(
             #data_path, target_size=(256, 256), batch_size=32, class_mode='categorical')
         #self.x_train = self.x_train.reshape(-1, self.img_rows,\
         	#self.img_cols, 1).astype(np.float32)
 
-        self.DCGAN = DCGAN(self.img_rows, self.img_cols, self.channel)
+        self.DCGAN = DCGAN()
         self.discriminator =  self.DCGAN.discriminator_model()
         self.adversarial = self.DCGAN.adversarial_model()
         self.generator = self.DCGAN.generator()
@@ -212,11 +215,11 @@ class MNIST_DCGAN(object):
     def train(self, train_steps=2000, batch_size=250, save_interval=0):
         noise_input = None
         if save_interval>0:
-            noise_input = np.random.normal(0, 0.02, size=[16, 100])
+            noise_input = np.random.uniform(-1.0, 1.0, size=[16, 100])
         for i in range(train_steps):
             images_train = self.x_train[np.random.randint(0,
                 self.x_train.shape[0], size=batch_size), :, :, :]
-            noise = np.random.normal(0, 0.02, size=[batch_size, 100])
+            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
             images_fake = self.generator.predict(noise)
             print images_train.shape, images_fake.shape
             x = np.concatenate((images_train, images_fake))
@@ -225,7 +228,7 @@ class MNIST_DCGAN(object):
             d_loss = self.discriminator.train_on_batch(x, y)
 
             y = np.ones([batch_size, 1])
-            noise = np.random.normal(0, 0.02, size=[batch_size, 100])
+            noise = np.random.uniform(-1.0, 1.0, size=[batch_size, 100])
             a_loss = self.adversarial.train_on_batch(noise, y)
             log_mesg = "%d: [D loss: %f, acc: %f]" % (i, d_loss[0], d_loss[1])
             log_mesg = "%s  [A loss: %f, acc: %f]" % (log_mesg, a_loss[0], a_loss[1])
@@ -236,13 +239,12 @@ class MNIST_DCGAN(object):
                         noise=noise_input, step=(i+1))
 
     def plot_images(self, save2file=False, fake=True, samples=16, noise=None, step=0):
-        name = "cifar"
-        filename = name + '.png'
+        filename = 'cat.png'
         if fake:
             if noise is None:
-                noise = np.random.normal(0, 0.02, size=[samples, 100])
+                noise = np.random.uniform(-1.0, 1.0, size=[samples, 100])
             else:
-                filename = name + "_%d.png" % step
+                filename = "cat_%d.png" % step
             images = self.generator.predict(noise)
         else:
             i = np.random.randint(0, self.x_train.shape[0], samples)
@@ -252,12 +254,8 @@ class MNIST_DCGAN(object):
         for i in range(images.shape[0]):
             plt.subplot(4, 4, i+1)
             image = images[i, :, :, :]
-            image = np.reshape(image, [self.img_rows, self.img_cols, self.channel])
-            #comment below line while using color images
-            image = np.reshape(image, (self.img_rows, self.img_cols))
-            #image = np.reshape(image, [self.img_rows, self.img_cols
-            #print image.shape
-            plt.imshow(image, cmap='gray')
+            image = np.reshape(image, [self.img_rows, self.img_cols, 3])
+            plt.imshow(image)
             plt.axis('off')
         plt.tight_layout()
         if save2file:
@@ -269,7 +267,7 @@ class MNIST_DCGAN(object):
 if __name__ == '__main__':
     mnist_dcgan = MNIST_DCGAN()
     timer = ElapsedTimer()
-    mnist_dcgan.train(train_steps=5000, batch_size=128, save_interval=500)
+    mnist_dcgan.train(train_steps=10000, batch_size=256, save_interval=500)
     timer.elapsed_time()
     mnist_dcgan.plot_images(fake=True)
     mnist_dcgan.plot_images(fake=False, save2file=True)
